@@ -1,10 +1,11 @@
 /**
  * Conversation Timeline sidecar backend.
  *
- * Read-only over Antigravity's documented conversation transcripts & metadata:
+ * Read-only over Antigravity's local conversation metadata, annotations & transcripts:
+ *   - <appData>/annotations/<convId>.pbtxt & <appData>/conversation_summaries.db (native titles)
  *   - <appData>/brain/<convId>/.system_generated/logs/transcript.jsonl
  *   - `agentapi get-conversation-metadata <convId>`
- * Stores only its own caches & user stars/aliases under ANTIGRAVITY_EXECUTABLE_DATA_DIR.
+ * Stores only its own caches, translation cache & preferences under ANTIGRAVITY_EXECUTABLE_DATA_DIR.
  */
 import { execFile } from 'node:child_process';
 import {
@@ -24,11 +25,28 @@ import {
   DEFAULT_PREFS,
   UUID_RE,
   normalizePrefs,
+  parseAnnotationTitle,
   parseTranscriptFast,
   parseWorkspaceName,
+  resolveNativeTitle,
   resolvePaths,
   summarizePrompt,
 } from './lib.mjs';
+import {
+  DEFAULT_MS_ENDPOINT,
+  maskSecretKey,
+  needsTranslation,
+  normalizeMicrosoftEndpoint,
+  normalizeTranslatorConfig,
+  translateTitlesBatch,
+} from './translator.mjs';
+
+let DatabaseSync = null;
+try {
+  ({ DatabaseSync } = await import('node:sqlite'));
+} catch {
+  // Graceful fallback on Node < 22.5 where node:sqlite is unavailable
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { appDirs: APP_DIRS, dataDir: DATA_DIR } = resolvePaths();
@@ -41,6 +59,8 @@ try {
 
 const META_CACHE_FILE = join(DATA_DIR, 'metadata-cache.json');
 const PREFS_FILE = join(DATA_DIR, 'preferences.json');
+const TRANSLATIONS_CACHE_FILE = join(DATA_DIR, 'translations-cache.json');
+const TRANSLATOR_CONFIG_FILE = join(DATA_DIR, 'translator-config.json');
 
 function readJsonSafe(path, fallback) {
   try {
@@ -63,7 +83,7 @@ function writeJsonAtomic(path, value) {
 }
 
 // ---------------------------------------------------------------------------
-// Preferences (stars, custom aliases, view options)
+// Preferences (stars, custom aliases, view & translation toggle options)
 // ---------------------------------------------------------------------------
 
 let prefs = normalizePrefs(readJsonSafe(PREFS_FILE, DEFAULT_PREFS));
@@ -91,12 +111,206 @@ function updatePrefs(patch) {
   if (patch.timeField === 'created' || patch.timeField === 'updated') next.timeField = patch.timeField;
   if (typeof patch.hideSubagents === 'boolean') next.hideSubagents = patch.hideSubagents;
   if (typeof patch.showCalendar === 'boolean') next.showCalendar = patch.showCalendar;
+  if (typeof patch.translateTitles === 'boolean') next.translateTitles = patch.translateTitles;
   if (patch.lang === 'auto' || patch.lang === 'zh' || patch.lang === 'en') next.lang = patch.lang;
 
   prefs = normalizePrefs(next);
   writeJsonAtomic(PREFS_FILE, prefs);
   cachedEtag = '';
   return prefs;
+}
+
+// ---------------------------------------------------------------------------
+// Translation Cache & Microsoft Translator Configuration
+// ---------------------------------------------------------------------------
+
+const translationCache = new Map(
+  Object.entries(readJsonSafe(TRANSLATIONS_CACHE_FILE, {})).filter(
+    ([k, v]) => typeof k === 'string' && typeof v === 'string' && k && v
+  )
+);
+let rawTranslatorConfig = readJsonSafe(TRANSLATOR_CONFIG_FILE, {});
+let translationRev = 0;
+let translationSaveTimer = null;
+
+function scheduleTranslationSave() {
+  if (translationSaveTimer) return;
+  translationSaveTimer = setTimeout(() => {
+    translationSaveTimer = null;
+    writeJsonAtomic(TRANSLATIONS_CACHE_FILE, Object.fromEntries(translationCache));
+  }, 800);
+  if (translationSaveTimer.unref) translationSaveTimer.unref();
+}
+
+function activeTranslatorConfig() {
+  return normalizeTranslatorConfig(rawTranslatorConfig);
+}
+
+function publicTranslatorStatus() {
+  const cfg = activeTranslatorConfig();
+  const activeProvider =
+    cfg.provider === 'microsoft' || (cfg.provider === 'auto' && Boolean(cfg.apiKey))
+      ? 'microsoft'
+      : 'free';
+  return {
+    provider: cfg.provider,
+    activeProvider,
+    hasMicrosoftKey: Boolean(cfg.apiKey),
+    keyFromEnv: cfg.keyFromEnv,
+    maskedKey: maskSecretKey(cfg.apiKey),
+    region: cfg.region,
+    endpoint: cfg.endpoint || DEFAULT_MS_ENDPOINT,
+    cachedCount: translationCache.size,
+  };
+}
+
+async function handleTranslateRequest(data = {}) {
+  const rawList = Array.isArray(data.titles) ? data.titles : [];
+  const force = Boolean(data.force);
+  const cleaned = [...new Set(
+    rawList
+      .filter((t) => typeof t === 'string')
+      .map((t) => t.trim())
+      .filter((t) => needsTranslation(t))
+  )].slice(0, 60);
+
+  const translations = {};
+  const missing = [];
+
+  for (const t of cleaned) {
+    if (!force && translationCache.has(t)) {
+      translations[t] = translationCache.get(t);
+    } else {
+      missing.push(t);
+    }
+  }
+
+  const cfg = activeTranslatorConfig();
+  let providerUsed =
+    cfg.provider === 'microsoft' || (cfg.provider === 'auto' && Boolean(cfg.apiKey))
+      ? 'microsoft'
+      : 'free';
+
+  if (missing.length > 0) {
+    const batchOut = await translateTitlesBatch(missing, cfg);
+    providerUsed = batchOut.providerUsed;
+    let changed = false;
+    for (const [orig, zh] of Object.entries(batchOut.translations)) {
+      if (zh) {
+        translations[orig] = zh;
+        if (translationCache.get(orig) !== zh) {
+          translationCache.set(orig, zh);
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      translationRev++;
+      cachedEtag = '';
+      scheduleTranslationSave();
+    }
+  }
+
+  return {
+    ok: true,
+    providerUsed,
+    cachedCount: translationCache.size,
+    translations,
+  };
+}
+
+async function handleTranslatorConfigUpdate(data = {}) {
+  const nextRaw = { ...(rawTranslatorConfig && typeof rawTranslatorConfig === 'object' ? rawTranslatorConfig : {}) };
+
+  if (data.provider === 'auto' || data.provider === 'microsoft' || data.provider === 'free') {
+    nextRaw.provider = data.provider;
+  }
+  if (typeof data.region === 'string') {
+    nextRaw.region = data.region.trim().slice(0, 48);
+  }
+  if (typeof data.endpoint === 'string') {
+    nextRaw.endpoint = normalizeMicrosoftEndpoint(data.endpoint);
+  }
+  if (data.clearKey === true) {
+    delete nextRaw.apiKey;
+  } else if (typeof data.apiKey === 'string' && data.apiKey.trim()) {
+    nextRaw.apiKey = data.apiKey.trim();
+  }
+
+  if (data.test === true) {
+    const previewCfg = normalizeTranslatorConfig(nextRaw);
+    const sample = 'Browser Memory Usage Comparison';
+    const out = await translateTitlesBatch([sample], previewCfg);
+    return {
+      ...publicTranslatorStatus(),
+      testResult: {
+        ok: true,
+        original: sample,
+        translated: out.translations[sample] || '',
+        providerUsed: out.providerUsed,
+      },
+    };
+  }
+
+  rawTranslatorConfig = nextRaw;
+  writeJsonAtomic(TRANSLATOR_CONFIG_FILE, rawTranslatorConfig);
+
+  if (data.clearCache === true) {
+    translationCache.clear();
+    writeJsonAtomic(TRANSLATIONS_CACHE_FILE, {});
+  }
+
+  translationRev++;
+  cachedEtag = '';
+  return publicTranslatorStatus();
+}
+
+// ---------------------------------------------------------------------------
+// Read-only Summary DB Cache (fallback for older native titles in preview col)
+// ---------------------------------------------------------------------------
+
+const summaryDbCache = new Map(); // appDir -> { key, map }
+
+function getSummaryDbMap(appDir) {
+  if (!DatabaseSync) return null;
+  const dbPath = join(appDir, 'conversation_summaries.db');
+  let key = '';
+  try {
+    const st = statSync(dbPath);
+    let walMtime = 0;
+    try { walMtime = statSync(`${dbPath}-wal`).mtimeMs; } catch {}
+    key = `${st.size}:${st.mtimeMs}:${walMtime}`;
+  } catch {
+    return null;
+  }
+
+  const cached = summaryDbCache.get(appDir);
+  if (cached && cached.key === key) return cached.map;
+
+  let db = null;
+  try {
+    db = new DatabaseSync(dbPath, { readOnly: true });
+    const rows = db
+      .prepare('SELECT conversation_id, title, preview FROM conversation_summaries')
+      .all();
+    const map = new Map();
+    for (const r of rows) {
+      if (typeof r.conversation_id === 'string') {
+        map.set(r.conversation_id.toLowerCase(), {
+          title: typeof r.title === 'string' ? r.title : '',
+          preview: typeof r.preview === 'string' ? r.preview : '',
+        });
+      }
+    }
+    summaryDbCache.set(appDir, { key, map });
+    return map;
+  } catch {
+    return cached?.map || null;
+  } finally {
+    if (db) {
+      try { db.close(); } catch {}
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -215,6 +429,9 @@ function scanConversations(force = false) {
     const brainRoot = join(appDir, 'brain');
     if (!existsSync(brainRoot)) continue;
 
+    const annotationsDir = join(appDir, 'annotations');
+    const summaryMap = getSummaryDbMap(appDir);
+
     let entries = [];
     try {
       entries = readdirSync(brainRoot);
@@ -230,6 +447,7 @@ function scanConversations(force = false) {
 
       const convDir = join(brainRoot, rawName);
       const transcriptPath = join(convDir, '.system_generated', 'logs', 'transcript.jsonl');
+      const annPath = join(annotationsDir, `${rawName}.pbtxt`);
 
       let tStat;
       try {
@@ -239,20 +457,39 @@ function scanConversations(force = false) {
       }
 
       let dMtime = 0;
-      try {
-        dMtime = statSync(convDir).mtimeMs;
-      } catch {}
+      try { dMtime = statSync(convDir).mtimeMs; } catch {}
 
-      const stamp = `v2:${tStat.size}:${tStat.mtimeMs}:${dMtime}`;
+      let annMtime = 0;
+      try { annMtime = statSync(annPath).mtimeMs; } catch {}
+
+      const dbRow = summaryMap?.get(id);
+      const dbTag = dbRow ? `${dbRow.title}|${dbRow.preview.slice(0, 40)}` : '';
+      const stamp = `v4:${tStat.size}:${tStat.mtimeMs}:${dMtime}:${annMtime}:${dbTag}`;
+
       let base = recordCache.get(id);
       if (!base || base.stamp !== stamp) {
         const parsed = parseTranscriptFast(transcriptPath, tStat.size, tStat.mtimeMs);
         const artifacts = listArtifacts(convDir);
-        const { title, snippet } = summarizePrompt(parsed.promptText, artifacts, parsed.assistantText);
+        const { snippet } = summarizePrompt(parsed.promptText, artifacts, parsed.assistantText);
+
+        let annotationTitle = '';
+        if (annMtime > 0) {
+          try {
+            annotationTitle = parseAnnotationTitle(readFileSync(annPath, 'utf-8'));
+          } catch {}
+        }
+
+        const nativeTitle = resolveNativeTitle({
+          annotationTitle,
+          dbTitle: dbRow?.title || '',
+          dbPreview: dbRow?.preview || '',
+        });
+
         base = {
           id,
           stamp,
-          autoTitle: title,
+          nativeTitle,
+          needsTranslation: needsTranslation(nativeTitle),
           snippet,
           artifacts,
           transcriptCreatedAt: parsed.createdAt,
@@ -268,13 +505,20 @@ function scanConversations(force = false) {
       if (!meta) enqueueMetadata(id);
 
       const alias = prefs.aliases[id] || '';
+      const translatedTitle = base.needsTranslation
+        ? (translationCache.get(base.nativeTitle) || '')
+        : '';
       const createdAt = meta?.createdAt || base.transcriptCreatedAt;
       const updatedAt = base.updatedAt;
 
       list.push({
         id,
-        title: alias || base.autoTitle,
-        autoTitle: base.autoTitle,
+        title: alias || base.nativeTitle,
+        nativeTitle: base.nativeTitle,
+        autoTitle: base.nativeTitle,
+        translatedTitle,
+        needsTranslation: base.needsTranslation,
+        alias,
         hasAlias: Boolean(alias),
         snippet: base.snippet,
         artifacts: base.artifacts,
@@ -302,7 +546,8 @@ function buildPayload(query = {}) {
   const force = query.force === '1' || query.force === true;
   const items = scanConversations(force);
   const currentConv = (query.conversationId || '').toLowerCase();
-  const etag = `${items.length}:${items[0]?.id || ''}:${items[0]?.updatedAt || ''}:${metaCache.size}:${JSON.stringify(prefs)}:${currentConv}`;
+  const trStatus = publicTranslatorStatus();
+  const etag = `${items.length}:${items[0]?.id || ''}:${items[0]?.nativeTitle || ''}:${items[0]?.updatedAt || ''}:${metaCache.size}:${translationRev}:${JSON.stringify(prefs)}:${trStatus.activeProvider}:${currentConv}`;
 
   if (!force && query.etag && query.etag === etag && cachedEtag === etag) {
     return { unchanged: true, etag, currentConversationId: currentConv };
@@ -317,6 +562,7 @@ function buildPayload(query = {}) {
     metaPendingCount: metaPending.size,
     workspaces,
     preferences: prefs,
+    translator: trStatus,
     conversations: items,
   };
 }
@@ -335,6 +581,7 @@ if (process.argv.includes('--self-test')) {
     dataDir: DATA_DIR,
     scanMs: Number(dt),
     totalConversations: payload.conversations.length,
+    sampleTitles: payload.conversations.slice(0, 6).map((c) => c.nativeTitle),
   }, null, 2));
   process.exit(0);
 }
@@ -342,7 +589,7 @@ if (process.argv.includes('--self-test')) {
 async function loadSdk() {
   try {
     return await import('sidecar_sdk');
-  } catch (err) {
+  } catch {
     const resolved = createRequire(import.meta.url).resolve('sidecar_sdk');
     return import(pathToFileURL(resolved).href);
   }
@@ -382,6 +629,9 @@ app.api(
 
 app.api('/api/preferences', () => prefs, 'GET');
 app.api('/api/preferences', (data) => updatePrefs(data), 'POST');
+app.api('/api/translate', (data) => handleTranslateRequest(data), 'POST');
+app.api('/api/translator-config', () => publicTranslatorStatus(), 'GET');
+app.api('/api/translator-config', (data) => handleTranslatorConfigUpdate(data), 'POST');
 
 console.log(`[conversation-timeline] indexing ${APP_DIRS.join(', ')}`);
 app.run();

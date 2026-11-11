@@ -4,59 +4,149 @@ import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  compactInlineUrls,
-  extractAssistantTopic,
   extractPromptText,
   normalizePrefs,
+  parseAnnotationTitle,
   parseTranscriptFast,
   parseWorkspaceName,
-  promoteChineseClause,
+  resolveNativeTitle,
   resolvePaths,
-  summarizePrompt,
 } from '../lib.mjs';
+import {
+  needsTranslation,
+  normalizeMicrosoftEndpoint,
+  postPolishChinese,
+  preNormalizeForMT,
+  translateTitlesBatch,
+} from '../translator.mjs';
 
 test('extractPromptText extracts USER_REQUEST and strips metadata blocks', () => {
   const raw = `<USER_REQUEST>\n帮我按年/月/日整理左侧对话列表\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\ntime\n</ADDITIONAL_METADATA>`;
   assert.equal(extractPromptText(raw), '帮我按年/月/日整理左侧对话列表');
 });
 
-test('compactInlineUrls and promoteChineseClause put Chinese subject at the beginning', () => {
-  const githubPrompt = summarizePrompt('https://github.com/viarotel-org/escrcpy 这个项目能控制iphone来打卡吗？');
-  assert.equal(githubPrompt.title, '这个项目能控制iphone来打卡吗？（escrcpy）');
-
-  const localPathPrompt = summarizePrompt('/Users/wangqi/Downloads/408309-1080p.mp4给这个视频加中文字幕。');
-  assert.equal(localPathPrompt.title, '给这个视频加中文字幕（408309-1080p.mp4）');
-
+test('parseAnnotationTitle decodes raw UTF-8, escaped quotes, and protobuf octal UTF-8 bytes', () => {
   assert.equal(
-    promoteChineseClause('GAMECO_MASTER_FIX_RETAIN_DUP_261027帮我审查下这个修复的代码'),
-    '帮我审查下这个修复的代码（GAMECO_MASTER_FIX_RE…）'
+    parseAnnotationTitle('title:"Browser Memory Usage Comparison" last_user_view_time:{seconds:1794311171}'),
+    'Browser Memory Usage Comparison'
   );
-
-  const multiLineUrlFirst = summarizePrompt(
-    'http://172.16.0.133:10580/plan-center\n登录之后检查一下工时同步报错'
+  assert.equal(
+    parseAnnotationTitle('title:"起落架工卡交接需求分析"  last_user_view_time:{seconds:1794386197}'),
+    '起落架工卡交接需求分析'
   );
-  assert.equal(multiLineUrlFirst.title, '登录之后检查一下工时同步报错');
+  assert.equal(
+    parseAnnotationTitle('title:"Fix \\"NPE\\" in Service"'),
+    'Fix "NPE" in Service'
+  );
+  // "\346\265\213\350\257\225" == UTF-8 bytes for "测试"
+  assert.equal(
+    parseAnnotationTitle('title:"\\346\\265\\213\\350\\257\\225"'),
+    '测试'
+  );
+  assert.equal(parseAnnotationTitle('archived:true'), '');
 });
 
-test('summarizePrompt enriches vague prompts using artifacts or AI Chinese reply headings', () => {
-  const feishuVague = summarizePrompt(
-    'https://acn6eda1cxtm.feishu.cn/wiki/EhANw0mDniqq\n帮我看下这个需求需要怎么做',
-    ['LR_HOV_01_需求纠偏与落地指南.md'],
-    ''
-  );
-  assert.equal(feishuVague.title, 'LR HOV 01 需求纠偏与落地指南');
-
-  const screenshotOnly = summarizePrompt(
-    '看看这个问题',
-    [],
-    '### 1. 南航 Pre 页面加载异常根因分析\n接口返回超时导致渲染中断。'
-  );
-  assert.equal(screenshotOnly.title, '南航 Pre 页面加载异常根因分析');
+test('resolveNativeTitle preserves native sidebar titles with proper fallback priority', () => {
   assert.equal(
-    extractAssistantTopic('## 一句话结论\n这次报错是因为 **南航 Pre 网关鉴权缓存未刷新** 导致的。\n## 详细根因剖析\n...'),
-    '南航 Pre 网关鉴权缓存未刷新'
+    resolveNativeTitle({
+      annotationTitle: 'Using Rooted Phone As Computer',
+      dbTitle: 'Old Title',
+      dbPreview: 'Preview',
+    }),
+    'Using Rooted Phone As Computer'
   );
-  assert.equal(extractAssistantTopic('我把最新版的 **起落架工卡交接需求** 梳理如下'), '起落架工卡交接需求');
+  assert.equal(
+    resolveNativeTitle({
+      annotationTitle: '',
+      dbTitle: '',
+      dbPreview: 'Work Package Issuance Failure',
+    }),
+    'Work Package Issuance Failure'
+  );
+  assert.equal(resolveNativeTitle({}), 'New Conversation');
+});
+
+test('needsTranslation detects pure English titles and skips titles already containing Chinese', () => {
+  assert.equal(needsTranslation('Using Rooted Phone As Computer'), true);
+  assert.equal(needsTranslation('IntelliJ IDEA Power Save Mode'), true);
+  assert.equal(needsTranslation('GAMECO API 菜单权限映射'), false);
+  assert.equal(needsTranslation('起落架工卡交接需求分析'), false);
+  assert.equal(needsTranslation('12345'), false);
+});
+
+test('normalizeMicrosoftEndpoint enforces HTTPS and official Microsoft/Azure domains', () => {
+  assert.equal(
+    normalizeMicrosoftEndpoint('https://api.cognitive.microsofttranslator.com/'),
+    'https://api.cognitive.microsofttranslator.com'
+  );
+  assert.equal(
+    normalizeMicrosoftEndpoint('https://api.translator.azure.cn'),
+    'https://api.translator.azure.cn'
+  );
+  assert.throws(() => normalizeMicrosoftEndpoint('http://api.cognitive.microsofttranslator.com'));
+  assert.throws(() => normalizeMicrosoftEndpoint('https://127.0.0.1:8080'));
+  assert.throws(() => normalizeMicrosoftEndpoint('https://evil.example.com'));
+});
+
+test('translateTitlesBatch calls Microsoft Translator v3.0 when API key is configured', async () => {
+  let capturedUrl = '';
+  let capturedHeaders = {};
+  let capturedBody = null;
+
+  const fakeFetch = async (url, opts) => {
+    capturedUrl = url;
+    capturedHeaders = opts.headers;
+    capturedBody = JSON.parse(opts.body);
+    return {
+      ok: true,
+      json: async () => [
+        { translations: [{ text: '将启用 Root 的手机用作电脑', to: 'zh-Hans' }] },
+        { translations: [{ text: '更新昨天 TAPD 工作时间', to: 'zh-Hans' }] },
+      ],
+    };
+  };
+
+  const out = await translateTitlesBatch(
+    ['Using Rooted Phone As Computer', 'Update Yesterday Tapd Hours', 'New Conversation'],
+    {
+      provider: 'auto',
+      apiKey: 'ms-test-key-123456',
+      region: 'eastasia',
+      endpoint: 'https://api.cognitive.microsofttranslator.com',
+    },
+    fakeFetch
+  );
+
+  assert.equal(out.providerUsed, 'microsoft');
+  assert.equal(capturedUrl, 'https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&to=zh-Hans');
+  assert.equal(capturedHeaders['Ocp-Apim-Subscription-Key'], 'ms-test-key-123456');
+  assert.equal(capturedHeaders['Ocp-Apim-Subscription-Region'], 'eastasia');
+  assert.equal(capturedBody[0].Text, preNormalizeForMT('Using Rooted Phone As Computer'));
+  assert.equal(out.translations['Using Rooted Phone As Computer'], '将已 Root 手机用作电脑');
+  assert.equal(out.translations['Update Yesterday Tapd Hours'], '更新昨天 TAPD 工时');
+  assert.equal(out.translations['New Conversation'], '新对话');
+});
+
+test('translateTitlesBatch falls back to free public batch API when no Microsoft key is set', async () => {
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({
+      responseStatus: 200,
+      responseData: {
+        translatedText: '[0] IntelliJ IDEA省电模式\n[1] 调试SIT API超时',
+      },
+    }),
+  });
+
+  const out = await translateTitlesBatch(
+    ['IntelliJ IDEA Power Save Mode', 'Debugging SIT API Timeout'],
+    { provider: 'auto', apiKey: '' },
+    fakeFetch
+  );
+
+  assert.equal(out.providerUsed, 'free');
+  assert.equal(out.translations['IntelliJ IDEA Power Save Mode'], postPolishChinese('IntelliJ IDEA省电模式'));
+  assert.equal(out.translations['Debugging SIT API Timeout'], '调试SIT API超时');
 });
 
 test('parseWorkspaceName supports POSIX and Windows file URIs', () => {
@@ -65,7 +155,7 @@ test('parseWorkspaceName supports POSIX and Windows file URIs', () => {
   assert.equal(parseWorkspaceName('C:\\Workspaces\\backend\\'), 'backend');
 });
 
-test('normalizePrefs validates UUIDs, aliases, and enums safely', () => {
+test('normalizePrefs validates UUIDs, aliases, translateTitles, and enums safely', () => {
   const validId = '2AB892DE-CCDB-4D96-AF84-58E919A3C8A5';
   const prefs = normalizePrefs({
     starred: [validId, 'not-a-uuid', validId.toLowerCase()],
@@ -75,6 +165,7 @@ test('normalizePrefs validates UUIDs, aliases, and enums safely', () => {
     },
     groupMode: 'ym',
     timeField: 'updated',
+    translateTitles: true,
     lang: 'en',
   });
   assert.deepEqual(prefs.starred, [validId.toLowerCase()]);
@@ -82,6 +173,7 @@ test('normalizePrefs validates UUIDs, aliases, and enums safely', () => {
   assert.equal(prefs.aliases.bad, undefined);
   assert.equal(prefs.groupMode, 'ym');
   assert.equal(prefs.timeField, 'updated');
+  assert.equal(prefs.translateTitles, true);
   assert.equal(prefs.lang, 'en');
 });
 

@@ -4,12 +4,40 @@
 
   const I18N = {
     zh: {
-      searchPlaceholder: '搜索标题、提问内容或日期（如 11-11）',
+      searchPlaceholder: '搜索英文/中文标题、内容或日期（如 11-11）',
       modeYmd: '年/月/日',
       modeYm: '年/月',
       timeCreated: '发起日',
       timeUpdated: '活跃日',
       allProjects: '全部项目',
+      translateBtnOff: '译中文',
+      translateBtnOn: '看原文',
+      translateBtnTipOff: '点击将英文会话标题翻译为中文',
+      translateBtnTipOn: '当前显示中文译文，点击一键切回英文原标题',
+      translateGearTip: '配置微软翻译服务（Azure Translator / 免费接口）',
+      trPanelTitle: '微软翻译服务配置',
+      trBadgeMs: '微软官方 API 已启用',
+      trBadgeFree: '免密公共接口',
+      trAuto: '自动优先微软',
+      trMs: '仅微软官方',
+      trFree: '免费公共接口',
+      trKeyPlaceholderEmpty: '粘贴微软 Azure Translator 免费 Key（F0 层 200万字/月，可留空）',
+      trKeyPlaceholderSaved: (mask) => `已保存 Key（${mask}），输入新值可覆盖`,
+      trKeyFromEnv: (mask) => `已从环境变量加载 Key（${mask}）`,
+      trClearKey: '清除 Key',
+      trRegionPlaceholder: 'Region（如 eastasia / global）',
+      trNote: '未填 Key 时默认通过免费接口即点即译并本地永久缓存；填入微软免费 F0 Key 后自动切换为微软官方批量接口。',
+      trClearCache: (n) => n > 0 ? `清空缓存 (${n})` : '清空缓存',
+      trTest: '测试连接',
+      trTesting: '测试中…',
+      trSave: '保存配置',
+      trSavedToast: '翻译配置已保存',
+      trKeyClearedToast: '已清除保存的微软 Key',
+      trCacheClearedToast: '已清空本地译文缓存',
+      trTestOkToast: (prov, out) => `连接正常（${prov === 'microsoft' ? '微软官方' : '免费接口'}）：${out}`,
+      trErrorPrefix: '翻译失败：',
+      rowTranslateTip: '翻译此条标题为中文',
+      rowOriginalTip: '切回英文原标题',
       calendarBtn: '日历',
       collapseAll: '收起全部',
       expandMonth: '展开当月',
@@ -18,6 +46,7 @@
       showAllDates: '显示全部日期',
       loading: '正在读取历史对话…',
       reconnecting: '连接后台索引服务中…',
+      translatingProgress: (n) => `正在翻译英文标题（剩余 ${n} 条）…`,
       refresh: '刷新',
       refreshedToast: '已重新扫描本地历史对话',
       copiedIdToast: (short) => `已复制会话 ID：${short}…`,
@@ -40,6 +69,7 @@
       summaryCount: (n, extra) => `共 ${n} 条对话${extra}`,
       filteredDate: (d) => ` · 已筛选 ${d}`,
       filteredSearch: ' · 搜索匹配',
+      translatedModeSuffix: ' · 中文译文',
       emptyTitle: '没有匹配的对话',
       emptyFilteredDesc: '可以尝试清空搜索词或取消日期筛选',
       emptyInitDesc: '发起新对话后会自动按年 / 月 / 日归档到这里',
@@ -48,12 +78,40 @@
       langBtn: 'EN',
     },
     en: {
-      searchPlaceholder: 'Search titles, prompts, or dates (e.g. 11-11)…',
+      searchPlaceholder: 'Search titles, translations, prompts, or dates…',
       modeYmd: 'Y / M / D',
       modeYm: 'Y / M',
       timeCreated: 'Created',
       timeUpdated: 'Updated',
       allProjects: 'All Projects',
+      translateBtnOff: '译中文',
+      translateBtnOn: 'Original',
+      translateBtnTipOff: 'Translate English conversation titles to Chinese',
+      translateBtnTipOn: 'Showing Chinese translations — click for English originals',
+      translateGearTip: 'Microsoft Translator Settings',
+      trPanelTitle: 'Microsoft Translator Settings',
+      trBadgeMs: 'Microsoft API Active',
+      trBadgeFree: 'Free Keyless API',
+      trAuto: 'Auto (MS First)',
+      trMs: 'Microsoft Only',
+      trFree: 'Free Public API',
+      trKeyPlaceholderEmpty: 'Azure Translator Free F0 Key (2M chars/mo, optional)',
+      trKeyPlaceholderSaved: (mask) => `Saved Key (${mask}) — type new key to replace`,
+      trKeyFromEnv: (mask) => `Loaded from env (${mask})`,
+      trClearKey: 'Clear Key',
+      trRegionPlaceholder: 'Region (e.g. eastasia / global)',
+      trNote: 'Works out-of-the-box via free API with local disk caching; add a free Azure F0 Key to use official Microsoft Translator.',
+      trClearCache: (n) => n > 0 ? `Clear Cache (${n})` : 'Clear Cache',
+      trTest: 'Test',
+      trTesting: 'Testing…',
+      trSave: 'Save',
+      trSavedToast: 'Translator settings saved',
+      trKeyClearedToast: 'Saved Microsoft key cleared',
+      trCacheClearedToast: 'Translation cache cleared',
+      trTestOkToast: (prov, out) => `OK (${prov === 'microsoft' ? 'Microsoft' : 'Free'}): ${out}`,
+      trErrorPrefix: 'Translation failed: ',
+      rowTranslateTip: 'Translate this title to Chinese',
+      rowOriginalTip: 'Show original English title',
       calendarBtn: 'Calendar',
       collapseAll: 'Collapse All',
       expandMonth: 'Expand Month',
@@ -62,6 +120,7 @@
       showAllDates: 'All Dates',
       loading: 'Loading conversations…',
       reconnecting: 'Connecting to timeline sidecar…',
+      translatingProgress: (n) => `Translating titles (${n} remaining)…`,
       refresh: 'Refresh',
       refreshedToast: 'Rescanned local conversations',
       copiedIdToast: (short) => `Copied conversation ID: ${short}…`,
@@ -84,6 +143,7 @@
       summaryCount: (n, extra) => `${n} conversation${n === 1 ? '' : 's'}${extra}`,
       filteredDate: (d) => ` · ${d}`,
       filteredSearch: ' · Search match',
+      translatedModeSuffix: ' · ZH',
       emptyTitle: 'No matching conversations',
       emptyFilteredDesc: 'Try clearing the search query or date filter.',
       emptyInitDesc: 'New conversations will automatically appear here organized by date.',
@@ -94,7 +154,7 @@
   };
 
   const MONTH_NAMES_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const MONTH_SHORT_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const MONTH_SHORT_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   const detectDefaultLang = () =>
     /^zh\b/i.test(navigator.language || '') ? 'zh' : 'en';
@@ -108,6 +168,7 @@
     timeField: 'created',
     hideSubagents: true,
     showCalendar: true,
+    translateTitles: false,
     langPref: 'auto', // 'auto' | 'zh' | 'en'
     workspaceFilter: '',
     searchQuery: '',
@@ -117,6 +178,24 @@
     openKeys: new Set(),
     initializedExpansion: false,
     renamingId: null,
+    // Translation runtime state
+    showTranslatePanel: false,
+    rowLangOverride: new Map(), // convId -> 'zh' | 'en'
+    localTranslations: new Map(), // nativeTitle -> zhTitle
+    translatingTitles: new Set(),
+    pendingTranslateCount: 0,
+    translatePumpRunning: false,
+    draftTrProvider: 'auto',
+    translator: {
+      provider: 'auto',
+      activeProvider: 'free',
+      hasMicrosoftKey: false,
+      keyFromEnv: false,
+      maskedKey: '',
+      region: '',
+      endpoint: 'https://api.cognitive.microsofttranslator.com',
+      cachedCount: 0,
+    },
   };
 
   const activeLang = () =>
@@ -153,8 +232,11 @@
   async function apiFetch(path, options = { method: 'GET' }) {
     const fn = window.sidecar?.fetch ? window.sidecar.fetch.bind(window.sidecar) : fetch;
     const res = await fn(path, options);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload?.error || `HTTP ${res.status}`);
+    }
+    return payload;
   }
 
   let toastTimer = null;
@@ -163,7 +245,7 @@
     el.textContent = msg;
     el.classList.remove('hidden');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.add('hidden'), 2200);
+    toastTimer = setTimeout(() => el.classList.add('hidden'), 2500);
   }
 
   function openConversation(convId) {
@@ -198,8 +280,169 @@
     if (prefs.timeField === 'created' || prefs.timeField === 'updated') state.timeField = prefs.timeField;
     if (typeof prefs.hideSubagents === 'boolean') state.hideSubagents = prefs.hideSubagents;
     if (typeof prefs.showCalendar === 'boolean') state.showCalendar = prefs.showCalendar;
+    if (typeof prefs.translateTitles === 'boolean') state.translateTitles = prefs.translateTitles;
     if (prefs.lang === 'auto' || prefs.lang === 'zh' || prefs.lang === 'en') state.langPref = prefs.lang;
     syncControlStates();
+  }
+
+  function applyTranslatorStatus(tr, syncInputs = false) {
+    if (!tr || typeof tr !== 'object') return;
+    state.translator = { ...state.translator, ...tr };
+    if (syncInputs) {
+      state.draftTrProvider = state.translator.provider || 'auto';
+      $('tr-ms-region').value = state.translator.region || '';
+      $('tr-ms-endpoint').value = state.translator.endpoint || 'https://api.cognitive.microsofttranslator.com';
+      $('tr-ms-key').value = '';
+    }
+    syncControlStates();
+  }
+
+  // ---------- Title Resolution & Translation Queue ----------
+  function getCachedZh(conv) {
+    const native = conv.nativeTitle || conv.autoTitle || '';
+    return state.localTranslations.get(native) || conv.translatedTitle || '';
+  }
+
+  function resolveRowTitle(conv) {
+    const native = conv.nativeTitle || conv.autoTitle || conv.title || 'New Conversation';
+    if (conv.hasAlias && conv.alias) {
+      return {
+        display: conv.alias,
+        showingTranslated: false,
+        isTranslating: false,
+        tooltip: `${conv.alias}\n原标题：${native}`,
+      };
+    }
+    if (!conv.needsTranslation) {
+      return {
+        display: native,
+        showingTranslated: false,
+        isTranslating: false,
+        tooltip: conv.snippet && conv.snippet !== native ? `${native}\n${conv.snippet}` : native,
+      };
+    }
+
+    const override = state.rowLangOverride.get(conv.id);
+    const wantZh = override ? override === 'zh' : state.translateTitles;
+    const zh = getCachedZh(conv);
+
+    if (wantZh) {
+      if (zh) {
+        return {
+          display: zh,
+          showingTranslated: true,
+          isTranslating: false,
+          tooltip: `${zh}\n英文原标题：${native}`,
+        };
+      }
+      return {
+        display: native,
+        showingTranslated: false,
+        isTranslating: state.translatingTitles.has(native),
+        tooltip: native,
+      };
+    }
+
+    return {
+      display: native,
+      showingTranslated: false,
+      isTranslating: false,
+      tooltip: zh ? `${native}\n中文译文：${zh}` : native,
+    };
+  }
+
+  function collectMissingEnglishTitles(priorityTitles = []) {
+    const ordered = [];
+    const seen = new Set();
+    const pushIfMissing = (title) => {
+      if (!title || seen.has(title)) return;
+      if (state.localTranslations.has(title) || state.translatingTitles.has(title)) return;
+      seen.add(title);
+      ordered.push(title);
+    };
+
+    for (const pt of priorityTitles) pushIfMissing(pt);
+
+    if (!state.translateTitles) {
+      for (const c of state.conversations) {
+        if (c.needsTranslation && !c.hasAlias && state.rowLangOverride.get(c.id) === 'zh' && !getCachedZh(c)) {
+          pushIfMissing(c.nativeTitle);
+        }
+      }
+      return ordered;
+    }
+
+    // Prioritize conversations inside open folders first so visible rows translate in <1s
+    const rest = [];
+    for (const c of state.conversations) {
+      if (state.hideSubagents && c.isSubagent) continue;
+      if (!c.needsTranslation || c.hasAlias || getCachedZh(c)) continue;
+      if (state.rowLangOverride.get(c.id) === 'en') continue;
+      const dp = itemDateParts(c);
+      const isVisibleFolder =
+        c.starred ||
+        state.openKeys.has(`d:${dp.ymdKey}`) ||
+        (state.groupMode === 'ym' && state.openKeys.has(`m:${dp.ymKey}`));
+      if (isVisibleFolder) pushIfMissing(c.nativeTitle);
+      else rest.push(c.nativeTitle);
+    }
+    for (const r of rest) pushIfMissing(r);
+    return ordered;
+  }
+
+  async function ensureTranslations(priorityTitles = []) {
+    if (state.translatePumpRunning && priorityTitles.length === 0) return;
+    state.translatePumpRunning = true;
+
+    try {
+      while (true) {
+        const queue = collectMissingEnglishTitles(priorityTitles);
+        priorityTitles = [];
+        state.pendingTranslateCount = queue.length;
+        $('translate-busy-dot').classList.toggle('hidden', queue.length === 0);
+
+        if (queue.length === 0) {
+          renderSummaryBar(dateFilteredConversations(baseFilteredConversations()).length);
+          break;
+        }
+
+        const batch = queue.slice(0, 20);
+        for (const tStr of batch) state.translatingTitles.add(tStr);
+        renderTree();
+
+        try {
+          const res = await apiFetch('/api/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ titles: batch }),
+          });
+          const map = res?.translations || {};
+          for (const [orig, zh] of Object.entries(map)) {
+            if (zh) state.localTranslations.set(orig, zh);
+          }
+          if (typeof res?.cachedCount === 'number') {
+            state.translator.cachedCount = res.cachedCount;
+          }
+          for (const c of state.conversations) {
+            if (map[c.nativeTitle]) c.translatedTitle = map[c.nativeTitle];
+          }
+        } catch (err) {
+          showToast(`${t().trErrorPrefix}${err.message}`);
+          for (const tStr of batch) state.translatingTitles.delete(tStr);
+          break;
+        } finally {
+          for (const tStr of batch) state.translatingTitles.delete(tStr);
+        }
+
+        syncControlStates();
+        renderTree();
+      }
+    } finally {
+      state.translatePumpRunning = false;
+      state.pendingTranslateCount = 0;
+      $('translate-busy-dot').classList.add('hidden');
+      renderSummaryBar(dateFilteredConversations(baseFilteredConversations()).length);
+    }
   }
 
   // ---------- Date Helpers (Viewer Local Timezone) ----------
@@ -252,7 +495,8 @@
       if (state.workspaceFilter && c.workspace !== state.workspaceFilter) return false;
       if (q) {
         const dp = itemDateParts(c);
-        const hay = `${c.title}\n${c.autoTitle}\n${c.snippet}\n${(c.artifacts || []).join(' ')}\n${dp.ymdKey}\n${dp.year}年${dp.month}月${dp.day}日`.toLowerCase();
+        const zh = getCachedZh(c);
+        const hay = `${c.title}\n${c.nativeTitle}\n${zh}\n${c.snippet}\n${(c.artifacts || []).join(' ')}\n${dp.ymdKey}\n${dp.year}年${dp.month}月${dp.day}日`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -352,6 +596,21 @@
     $('cal-grid').innerHTML = html;
   }
 
+  function renderSummaryBar(visibleCount) {
+    const L = t();
+    if (state.pendingTranslateCount > 0) {
+      $('summary-text').textContent = L.translatingProgress(state.pendingTranslateCount);
+      return;
+    }
+    const filterDesc = state.selectedDateFilter
+      ? L.filteredDate(state.selectedDateFilter)
+      : state.searchQuery.trim()
+        ? L.filteredSearch
+        : '';
+    const trSuffix = state.translateTitles ? L.translatedModeSuffix : '';
+    $('summary-text').textContent = L.summaryCount(visibleCount, `${filterDesc}${trSuffix}`);
+  }
+
   // ---------- Render Conversation Row ----------
   function renderConvRow(conv, dp, showMonthDay) {
     const L = t();
@@ -366,22 +625,25 @@
     if (isRenaming) {
       return `<div class="${rowCls}" data-conv-id="${esc(conv.id)}">
         <form class="rename-form" data-rename-form="${esc(conv.id)}">
-          <input class="rename-input" type="text" value="${esc(conv.hasAlias ? conv.title : conv.autoTitle)}" placeholder="${esc(L.renamePlaceholder)}" maxlength="120" />
+          <input class="rename-input" type="text" value="${esc(conv.hasAlias ? conv.alias : conv.nativeTitle)}" placeholder="${esc(L.renamePlaceholder)}" maxlength="120" />
           <button type="submit" class="ghost-btn active">${esc(L.save)}</button>
           <button type="button" class="ghost-btn" data-rename-cancel="1">${esc(L.cancel)}</button>
         </form>
       </div>`;
     }
 
+    const { display, showingTranslated, isTranslating, tooltip } = resolveRowTitle(conv);
     const timeText = showMonthDay ? dp.monthDayClock : dp.clock;
     const firstArtifact = conv.artifacts?.[0] ? conv.artifacts[0].replace(/\.md$/i, '') : '';
     const showSub = Boolean(firstArtifact || (state.workspaces.length > 1 && conv.workspace));
+    const canRowTranslate = conv.needsTranslation && !conv.hasAlias;
+    const trTip = showingTranslated ? L.rowOriginalTip : L.rowTranslateTip;
 
     return `<div class="${rowCls}" data-conv-id="${esc(conv.id)}">
-      <button type="button" class="conv-main" data-open-conv="${esc(conv.id)}" title="${esc(conv.snippet || conv.title)}">
+      <button type="button" class="conv-main" data-open-conv="${esc(conv.id)}" title="${esc(tooltip)}">
         <div class="conv-top">
           ${isCurrent ? `<span class="current-pill">${esc(L.currentBadge)}</span>` : ''}
-          <span class="conv-title">${esc(conv.title)}</span>
+          <span class="conv-title ${isTranslating ? 'is-translating' : ''}">${esc(display)}</span>
           <span class="conv-time">${esc(timeText)}</span>
         </div>
         ${showSub ? `<div class="conv-sub">
@@ -390,6 +652,7 @@
         </div>` : ''}
       </button>
       <div class="conv-actions">
+        ${canRowTranslate ? `<button type="button" class="act-btn act-translate ${showingTranslated ? 'active' : ''}" data-row-translate="${esc(conv.id)}" title="${esc(trTip)}" aria-label="${esc(trTip)}">译</button>` : ''}
         <button type="button" class="act-btn act-rename" data-start-rename="${esc(conv.id)}" title="${esc(L.renameTip)}" aria-label="${esc(L.renameTip)}">✎</button>
         <button type="button" class="act-btn act-star ${conv.starred ? 'starred' : ''}" data-toggle-star="${esc(conv.id)}" title="${esc(conv.starred ? L.unstarTip : L.starTip)}" aria-label="Star">${conv.starred ? '★' : '☆'}</button>
       </div>
@@ -407,12 +670,7 @@
     const forceExpand = Boolean(state.searchQuery.trim() || state.selectedDateFilter);
     const { todayYmd, yesterdayYmd } = todayKeys();
 
-    const filterDesc = state.selectedDateFilter
-      ? L.filteredDate(state.selectedDateFilter)
-      : state.searchQuery.trim()
-        ? L.filteredSearch
-        : '';
-    $('summary-text').textContent = L.summaryCount(visibleList.length, filterDesc);
+    renderSummaryBar(visibleList.length);
 
     const anyFolderOpen = state.openKeys.size > 1;
     $('fold-toggle-btn').textContent = anyFolderOpen ? L.collapseAll : L.expandMonth;
@@ -551,6 +809,41 @@
     $('refresh-btn').textContent = L.refresh;
     $('lang-toggle-btn').textContent = L.langBtn;
 
+    // Translate toggle button & inline settings drawer
+    $('translate-split').classList.toggle('is-active', state.translateTitles);
+    $('translate-btn-label').textContent = state.translateTitles ? L.translateBtnOn : L.translateBtnOff;
+    $('translate-toggle-btn').title = state.translateTitles ? L.translateBtnTipOn : L.translateBtnTipOff;
+    $('translate-cfg-btn').title = L.translateGearTip;
+    $('translate-cfg-btn').classList.toggle('open', state.showTranslatePanel);
+    $('ms-key-dot').classList.toggle('hidden', !state.translator.hasMicrosoftKey);
+
+    $('translate-panel').classList.toggle('hidden', !state.showTranslatePanel);
+    $('tr-panel-title').textContent = L.trPanelTitle;
+    const isMsActive = state.translator.activeProvider === 'microsoft' && state.translator.hasMicrosoftKey;
+    $('tr-status-badge').textContent = isMsActive ? L.trBadgeMs : L.trBadgeFree;
+    $('tr-status-badge').classList.toggle('is-ms', isMsActive);
+    $('btn-tr-auto').textContent = L.trAuto;
+    $('btn-tr-ms').textContent = L.trMs;
+    $('btn-tr-free').textContent = L.trFree;
+    $('tr-ms-region').placeholder = L.trRegionPlaceholder;
+    $('tr-note').textContent = L.trNote;
+    $('tr-clear-key-btn').textContent = L.trClearKey;
+    $('tr-clear-key-btn').classList.toggle('hidden', !state.translator.hasMicrosoftKey || state.translator.keyFromEnv);
+    $('tr-clear-cache-btn').textContent = L.trClearCache(state.translator.cachedCount || 0);
+    if (!$('tr-test-btn').disabled) $('tr-test-btn').textContent = L.trTest;
+    $('tr-save-btn').textContent = L.trSave;
+
+    $('tr-ms-key').placeholder = state.translator.hasMicrosoftKey
+      ? (state.translator.keyFromEnv
+          ? L.trKeyFromEnv(state.translator.maskedKey)
+          : L.trKeyPlaceholderSaved(state.translator.maskedKey))
+      : L.trKeyPlaceholderEmpty;
+
+    document.querySelectorAll('[data-tr-provider]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.trProvider === state.draftTrProvider);
+    });
+    $('tr-ms-fields').classList.toggle('hidden', state.draftTrProvider === 'free');
+
     document.querySelectorAll('[data-group-mode]').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.groupMode === state.groupMode);
     });
@@ -588,10 +881,22 @@
 
       state.etag = data.etag || '';
       state.conversations = Array.isArray(data.conversations) ? data.conversations : [];
+      for (const c of state.conversations) {
+        if (c.nativeTitle && c.translatedTitle) {
+          state.localTranslations.set(c.nativeTitle, c.translatedTitle);
+        }
+      }
       state.workspaces = Array.isArray(data.workspaces) ? data.workspaces : [];
       applyServerPrefs(data.preferences);
+      if (data.translator) {
+        applyTranslatorStatus(data.translator, !state.showTranslatePanel);
+      }
       syncControlStates();
       renderTree();
+
+      if (state.translateTitles) {
+        ensureTranslations();
+      }
     } catch {
       $('summary-text').textContent = t().reconnecting;
     }
@@ -613,13 +918,17 @@
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === '/' && document.activeElement !== $('search-input') && !state.renamingId) {
+    const tag = document.activeElement?.tagName;
+    if (e.key === '/' && tag !== 'INPUT' && !state.renamingId) {
       e.preventDefault();
       $('search-input').focus();
     } else if (e.key === 'Escape') {
       if (state.renamingId) {
         state.renamingId = null;
         renderTree();
+      } else if (state.showTranslatePanel) {
+        state.showTranslatePanel = false;
+        syncControlStates();
       } else if (state.searchQuery) {
         state.searchQuery = '';
         $('search-input').value = '';
@@ -635,6 +944,7 @@
       syncControlStates();
       renderTree();
       savePref({ groupMode: state.groupMode });
+      if (state.translateTitles) ensureTranslations();
     });
   });
 
@@ -650,6 +960,121 @@
   $('workspace-select').addEventListener('change', (e) => {
     state.workspaceFilter = e.target.value;
     renderTree();
+  });
+
+  // Global One-Click Translate Toggle
+  $('translate-toggle-btn').addEventListener('click', () => {
+    state.translateTitles = !state.translateTitles;
+    state.rowLangOverride.clear();
+    syncControlStates();
+    renderTree();
+    savePref({ translateTitles: state.translateTitles });
+    if (state.translateTitles) {
+      ensureTranslations();
+    }
+  });
+
+  // Microsoft Translator Settings Drawer Controls
+  $('translate-cfg-btn').addEventListener('click', () => {
+    state.showTranslatePanel = !state.showTranslatePanel;
+    if (state.showTranslatePanel) {
+      state.draftTrProvider = state.translator.provider || 'auto';
+      $('tr-ms-region').value = state.translator.region || '';
+      $('tr-ms-endpoint').value = state.translator.endpoint || 'https://api.cognitive.microsofttranslator.com';
+      $('tr-ms-key').value = '';
+    }
+    syncControlStates();
+  });
+
+  $('tr-panel-close').addEventListener('click', () => {
+    state.showTranslatePanel = false;
+    syncControlStates();
+  });
+
+  document.querySelectorAll('[data-tr-provider]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.draftTrProvider = btn.dataset.trProvider;
+      syncControlStates();
+    });
+  });
+
+  $('tr-test-btn').addEventListener('click', async () => {
+    const L = t();
+    $('tr-test-btn').disabled = true;
+    $('tr-test-btn').textContent = L.trTesting;
+    try {
+      const res = await apiFetch('/api/translator-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: state.draftTrProvider,
+          apiKey: $('tr-ms-key').value.trim(),
+          region: $('tr-ms-region').value.trim(),
+          endpoint: $('tr-ms-endpoint').value.trim(),
+          test: true,
+        }),
+      });
+      if (res?.testResult?.ok) {
+        showToast(L.trTestOkToast(res.testResult.providerUsed, res.testResult.translated));
+      }
+    } catch (err) {
+      showToast(`${L.trErrorPrefix}${err.message}`);
+    } finally {
+      $('tr-test-btn').disabled = false;
+      $('tr-test-btn').textContent = t().trTest;
+    }
+  });
+
+  $('tr-save-btn').addEventListener('click', async () => {
+    try {
+      const updated = await apiFetch('/api/translator-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: state.draftTrProvider,
+          apiKey: $('tr-ms-key').value.trim(),
+          region: $('tr-ms-region').value.trim(),
+          endpoint: $('tr-ms-endpoint').value.trim(),
+        }),
+      });
+      applyTranslatorStatus(updated, true);
+      showToast(t().trSavedToast);
+      if (state.translateTitles) ensureTranslations();
+    } catch (err) {
+      showToast(`${t().trErrorPrefix}${err.message}`);
+    }
+  });
+
+  $('tr-clear-key-btn').addEventListener('click', async () => {
+    try {
+      const updated = await apiFetch('/api/translator-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clearKey: true }),
+      });
+      applyTranslatorStatus(updated, true);
+      showToast(t().trKeyClearedToast);
+    } catch (err) {
+      showToast(`${t().trErrorPrefix}${err.message}`);
+    }
+  });
+
+  $('tr-clear-cache-btn').addEventListener('click', async () => {
+    try {
+      const updated = await apiFetch('/api/translator-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clearCache: true }),
+      });
+      state.localTranslations.clear();
+      for (const c of state.conversations) c.translatedTitle = '';
+      applyTranslatorStatus(updated, false);
+      renderTree();
+      showToast(t().trCacheClearedToast);
+      if (state.translateTitles) ensureTranslations();
+    } catch (err) {
+      showToast(`${t().trErrorPrefix}${err.message}`);
+    }
   });
 
   $('toggle-cal-btn').addEventListener('click', () => {
@@ -669,6 +1094,7 @@
       state.openKeys.add(`d:${todayYmd}`);
     }
     renderTree();
+    if (state.translateTitles) ensureTranslations();
   });
 
   $('lang-toggle-btn').addEventListener('click', () => {
@@ -703,6 +1129,7 @@
     state.openKeys.add(`y:${state.calYear}`);
     state.openKeys.add(`m:${ym}`);
     renderTree();
+    if (state.translateTitles) ensureTranslations();
   });
 
   $('cal-today').addEventListener('click', () => {
@@ -732,6 +1159,7 @@
     state.openKeys.add(`m:${y}-${m}`);
     state.openKeys.add(`d:${ymd}`);
     renderTree();
+    if (state.translateTitles) ensureTranslations();
   });
 
   $('refresh-btn').addEventListener('click', () => {
@@ -762,6 +1190,24 @@
         }
       }
       renderTree();
+      if (state.translateTitles) ensureTranslations();
+      return;
+    }
+
+    const rowTrBtn = e.target.closest('[data-row-translate]');
+    if (rowTrBtn) {
+      e.stopPropagation();
+      const id = rowTrBtn.dataset.rowTranslate;
+      const conv = state.conversations.find((c) => c.id === id);
+      if (!conv) return;
+      const curOverride = state.rowLangOverride.get(id);
+      const currentlyWantZh = curOverride ? curOverride === 'zh' : state.translateTitles;
+      const nextMode = currentlyWantZh ? 'en' : 'zh';
+      state.rowLangOverride.set(id, nextMode);
+      renderTree();
+      if (nextMode === 'zh' && !getCachedZh(conv)) {
+        ensureTranslations([conv.nativeTitle]);
+      }
       return;
     }
 
@@ -803,10 +1249,6 @@
   });
 
   syncControlStates();
-  loadConversations(false);
-  setInterval(() => {
-    if (!document.hidden && !state.renamingId) {
-      loadConversations(false);
-    }
-  }, POLL_MS);
+  loadConversations(true);
+  setInterval(() => loadConversations(false), POLL_MS);
 })();

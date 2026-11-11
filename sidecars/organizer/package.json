@@ -1,6 +1,6 @@
 {
   "name": "conversation-timeline-organizer",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "license": "MIT",
   "description": "Sidecar Web UI for organizing Antigravity conversations into Year / Month / Day folders",

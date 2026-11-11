@@ -33,8 +33,8 @@ Antigravity 2.0 原生左侧栏把所有日期的对话扁平堆叠在一起，�
 - **Collapsible `Year / Month / Day` Folder Tree（年 / 月 / 日 文件夹树）** — Expand `2026年` → `11月` → `11月11日` like Finder, or toggle to a compact `Year / Month` two-level tree in one click.
 - **Interactive Monthly Heat Calendar（月度热力日历）** — See daily conversation counts at a glance; click any date (e.g. `11`) to filter down to that day, and click again to return to the full tree.
 - **One-Click Native Switching（一键切换对话）** — Calls `window.sidecar.ui.toggleConversation(id)` to jump straight to any past session, highlighting your active session automatically.
-- **Smart Prompt & Artifact Titles + Custom Aliases（智能标题提取 + 自定义重命名 `✎`）** — Extracts readable titles directly from your first prompt (and generated `.md` artifacts), plus lets you rename any session with your own custom note.
-- **Starred Folder (`★`), Search & Multi-Project Filter（收藏置顶、全文检索与项目过滤）** — Pin important threads to the top, switch between **Created Date (发起日)** and **Last Updated (活跃日)**, filter by project workspace, and toggle **中文 / English (`中 / EN`)** anytime.
+- **Native Sidebar Titles + One-Click English ⇄ Chinese Translation（保留原生标题 + 一键中英互译 `译中文`）** — Displays Antigravity's exact native conversation titles (instead of raw prompts), with a one-click **`译中文` / `看原文`** toggle and per-row **`译`** button backed by **Microsoft Azure Translator v3.0 (`F0` Free 2M chars/mo)** + zero-config free fallback and permanent local disk cache.
+- **Starred Folder (`★`), Custom Aliases (`✎`), Search & Multi-Project Filter（收藏置顶、备注改名、双语检索与项目过滤）** — Pin important threads, set custom aliases, switch between **Created Date (发起日)** and **Last Updated (活跃日)**, and search across both original English titles and translated Chinese titles.
 - **Zero Dependencies & Sub-Millisecond Incremental Cache（零第三方依赖、极速增量索引）** — Reads only bounded head/tail chunks of `transcript.jsonl` so hundreds of conversations load instantaneously.
 
 ---
@@ -78,7 +78,7 @@ git clone https://github.com/Wriquet/conversation-timeline.git `
 
 ## Privacy & Security / 隐私与安全边界
 
-- **100% Local & Offline**: Reads only Antigravity's documented local conversation directory (`~/.gemini/antigravity/brain/<id>/.system_generated/logs/transcript.jsonl`) and `agentapi get-conversation-metadata`. Makes **zero external network requests** (strict CSP `connect-src 'self'`).
+- **Local-First & Strict CSP**: Reads Antigravity's local conversation metadata/annotations and `transcript.jsonl` read-only, with strict browser CSP (`connect-src 'self'`). External requests occur **only** when you click **`译中文`** to translate English titles (via Microsoft Azure Translator or the public translation endpoint), and results are cached locally on disk so subsequent toggles are 100% offline.
 - **Strictly Non-Intrusive**: Never modifies conversation transcripts, `config.json`, or Electron application bundles. Stars, custom title aliases, and UI preferences are stored exclusively inside the plugin's own sandboxed `ANTIGRAVITY_EXECUTABLE_DATA_DIR`.
 
 ---

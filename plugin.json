@@ -2,8 +2,8 @@
   "$schema": "https://antigravity.google/schemas/v1/plugin.json",
   "name": "conversation-timeline",
   "displayName": "Conversation Timeline",
-  "version": "1.1.0",
-  "description": "Organize conversation history into collapsible Year / Month / Day folders with an interactive monthly calendar, search, starring, custom titles, and one-click session switching.",
+  "version": "1.2.0",
+  "description": "Organize conversation history into collapsible Year / Month / Day folders with native sidebar titles, one-click Microsoft English-to-Chinese title translation, interactive calendar, and instant session switching.",
   "logo": "assets/logo.svg",
   "suggestedPrompts": [
     "打开按日期整理的对话时间归档面板",

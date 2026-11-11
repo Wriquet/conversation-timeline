@@ -1,6 +1,6 @@
 {
   "command": "node",
-  "args": ["main.mjs"],
+  "args": ["--no-warnings", "main.mjs"],
   "restart_policy": "always",
   "display_name": "Conversation Timeline",
   "description": "Organize conversation history into collapsible Year / Month / Day folders with a monthly calendar and one-click session switching.",

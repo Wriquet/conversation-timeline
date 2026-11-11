@@ -16,6 +16,7 @@ export const DEFAULT_PREFS = {
   timeField: 'created',  // 'created' | 'updated'
   hideSubagents: true,
   showCalendar: true,
+  translateTitles: false, // false = original native titles, true = translated Chinese titles
   lang: 'auto',          // 'auto' | 'zh' | 'en'
 };
 
@@ -70,8 +71,67 @@ export function normalizePrefs(raw) {
   if (raw.timeField === 'created' || raw.timeField === 'updated') out.timeField = raw.timeField;
   if (typeof raw.hideSubagents === 'boolean') out.hideSubagents = raw.hideSubagents;
   if (typeof raw.showCalendar === 'boolean') out.showCalendar = raw.showCalendar;
+  if (typeof raw.translateTitles === 'boolean') out.translateTitles = raw.translateTitles;
   if (raw.lang === 'auto' || raw.lang === 'zh' || raw.lang === 'en') out.lang = raw.lang;
   return out;
+}
+
+/**
+ * Extracts `title:"..."` from Antigravity's `<appData>/annotations/<id>.pbtxt`,
+ * decoding both raw UTF-8 and protobuf C/octal byte escapes.
+ */
+export function parseAnnotationTitle(pbtxt) {
+  if (typeof pbtxt !== 'string' || !pbtxt) return '';
+  const m = pbtxt.match(/(?:^|\s)title:\s*"((?:[^"\\]|\\.)*)"/);
+  if (!m) return '';
+  const raw = m[1];
+  if (!raw.includes('\\')) return raw.trim();
+
+  const bytes = [];
+  let out = '';
+  const flushBytes = () => {
+    if (bytes.length > 0) {
+      out += Buffer.from(bytes).toString('utf-8');
+      bytes.length = 0;
+    }
+  };
+
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] !== '\\') {
+      flushBytes();
+      out += raw[i];
+      continue;
+    }
+    const next = raw[i + 1] || '';
+    if (/[0-7]/.test(next)) {
+      const oct = raw.slice(i + 1, i + 4).match(/^[0-7]{1,3}/)[0];
+      bytes.push(parseInt(oct, 8));
+      i += oct.length;
+    } else {
+      flushBytes();
+      i++;
+      if (next === 'n') out += '\n';
+      else if (next === 'r') out += '\r';
+      else if (next === 't') out += '\t';
+      else out += next;
+    }
+  }
+  flushBytes();
+  return out.trim();
+}
+
+/**
+ * Resolves Antigravity's native sidebar title without replacing it with user prompt text.
+ */
+export function resolveNativeTitle({ annotationTitle = '', dbTitle = '', dbPreview = '' } = {}) {
+  for (const candidate of [annotationTitle, dbTitle, dbPreview]) {
+    if (typeof candidate !== 'string') continue;
+    const firstLine = candidate.split(/\r?\n/)[0].trim();
+    if (firstLine) {
+      return firstLine.length > 90 ? `${firstLine.slice(0, 88)}…` : firstLine;
+    }
+  }
+  return 'New Conversation';
 }
 
 export function parseWorkspaceName(uri) {

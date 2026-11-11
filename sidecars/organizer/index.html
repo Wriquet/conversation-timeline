@@ -20,7 +20,7 @@
           id="search-input"
           class="search-input"
           type="search"
-          placeholder="搜索标题、提问内容或日期（如 11-11）"
+          placeholder="搜索英文/中文标题、内容或日期（如 11-11）"
           autocomplete="off"
           spellcheck="false"
         >
@@ -44,11 +44,91 @@
 
         <div class="toolbar-spacer"></div>
 
+        <div class="translate-split" id="translate-split">
+          <button id="translate-toggle-btn" class="translate-main-btn" type="button" title="一键切换英文原标题 / 中文翻译">
+            <svg class="tr-icon" width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2.2 4.2h6.6M5.5 2.4v1.8M3.6 4.2c.3 2.5 1.8 4.6 4.2 5.8M7.3 4.2c-.5 2.3-2 4.4-4.6 5.8" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
+              <path d="M8.7 13.4l2.4-6.2 2.4 6.2M9.5 11.5h3.2" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span id="translate-btn-label">译中文</span>
+            <span id="translate-busy-dot" class="busy-dot hidden" aria-hidden="true"></span>
+          </button>
+          <button id="translate-cfg-btn" class="translate-gear-btn" type="button" title="配置微软翻译服务" aria-label="Translation Settings">
+            <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
+              <circle cx="5.5" cy="4.5" r="1.5" fill="var(--tl-bg)" stroke="currentColor" stroke-width="1.3"/>
+              <circle cx="10.5" cy="8" r="1.5" fill="var(--tl-bg)" stroke="currentColor" stroke-width="1.3"/>
+              <circle cx="6.5" cy="11.5" r="1.5" fill="var(--tl-bg)" stroke="currentColor" stroke-width="1.3"/>
+            </svg>
+            <span id="ms-key-dot" class="ms-key-dot hidden" aria-hidden="true"></span>
+          </button>
+        </div>
+
         <button id="toggle-cal-btn" class="ghost-btn active" type="button">日历</button>
         <button id="fold-toggle-btn" class="ghost-btn" type="button">收起全部</button>
-        <button id="lang-toggle-btn" class="ghost-btn" type="button" title="Switch Language / 切换语言">EN</button>
+        <button id="lang-toggle-btn" class="ghost-btn" type="button" title="Switch UI Language / 切换界面语言">EN</button>
       </div>
     </header>
+
+    <section id="translate-panel" class="translate-panel hidden" aria-label="Translation Settings">
+      <div class="tr-header">
+        <span id="tr-panel-title" class="tr-panel-title">微软翻译服务配置</span>
+        <span id="tr-status-badge" class="tr-badge">免密自动模式</span>
+        <div class="toolbar-spacer"></div>
+        <button id="tr-panel-close" class="icon-btn" type="button" aria-label="Close">✕</button>
+      </div>
+
+      <div class="tr-row">
+        <div class="seg-group" role="group" id="tr-provider-seg">
+          <button type="button" class="seg-btn active" data-tr-provider="auto" id="btn-tr-auto">自动优先微软</button>
+          <button type="button" class="seg-btn" data-tr-provider="microsoft" id="btn-tr-ms">仅微软官方</button>
+          <button type="button" class="seg-btn" data-tr-provider="free" id="btn-tr-free">免费公共接口</button>
+        </div>
+      </div>
+
+      <div id="tr-ms-fields" class="tr-fields">
+        <div class="tr-key-wrap">
+          <input
+            id="tr-ms-key"
+            class="tr-input"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="粘贴微软 Azure Translator 免费 Key（F0 层 200万字/月，可留空）"
+          >
+          <button id="tr-clear-key-btn" class="text-link-btn hidden" type="button">清除 Key</button>
+        </div>
+        <div class="tr-grid-2">
+          <input
+            id="tr-ms-region"
+            class="tr-input"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Region（如 eastasia / global）"
+          >
+          <input
+            id="tr-ms-endpoint"
+            class="tr-input"
+            type="url"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="https://api.cognitive.microsofttranslator.com"
+          >
+        </div>
+      </div>
+
+      <p id="tr-note" class="tr-note">
+        未填 Key 时默认通过免费接口即点即译并本地永久缓存；填入微软免费 F0 Key 后自动切换为微软官方批量接口。
+      </p>
+
+      <div class="tr-actions">
+        <button id="tr-clear-cache-btn" class="text-link-btn" type="button">清空译文缓存</button>
+        <div class="toolbar-spacer"></div>
+        <button id="tr-test-btn" class="ghost-btn" type="button">测试连接</button>
+        <button id="tr-save-btn" class="ghost-btn active" type="button">保存配置</button>
+      </div>
+    </section>
 
     <section id="calendar-panel" class="calendar-panel" aria-label="Monthly Calendar">
       <div class="cal-header">

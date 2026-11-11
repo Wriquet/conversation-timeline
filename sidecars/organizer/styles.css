@@ -190,6 +190,189 @@ button, input, select {
   background: var(--tl-active-bg);
 }
 
+/* Split Translate Toggle + Settings Pill */
+.translate-split {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  border-radius: 5px;
+  border: 1px solid var(--tl-border);
+  background: var(--tl-subtle-fill);
+  overflow: hidden;
+}
+
+.translate-split.is-active {
+  border-color: color-mix(in srgb, var(--tl-primary) 42%, var(--tl-border));
+  background: var(--tl-active-bg);
+}
+
+.translate-main-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  padding: 0 7px;
+  border: none;
+  background: transparent;
+  color: var(--tl-fg-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.translate-main-btn:hover {
+  background: var(--tl-hover);
+  color: var(--tl-fg);
+}
+
+.translate-split.is-active .translate-main-btn {
+  color: var(--tl-primary);
+  font-weight: 500;
+}
+
+.tr-icon {
+  flex-shrink: 0;
+  opacity: 0.88;
+}
+
+.busy-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tl-primary);
+  animation: tl-pulse 1s ease-in-out infinite;
+}
+
+@keyframes tl-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.translate-gear-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--tl-border);
+  background: transparent;
+  color: var(--tl-muted);
+  cursor: pointer;
+}
+
+.translate-gear-btn:hover,
+.translate-gear-btn.open {
+  background: var(--tl-hover);
+  color: var(--tl-fg);
+}
+
+.ms-key-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 4.5px;
+  height: 4.5px;
+  border-radius: 50%;
+  background: var(--tl-primary);
+}
+
+/* Inline Collapsible Microsoft Translator Settings Drawer */
+.translate-panel {
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid var(--tl-border);
+  background: color-mix(in srgb, var(--tl-surface) 45%, var(--tl-bg));
+  flex-shrink: 0;
+}
+
+.tr-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.tr-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tl-fg);
+}
+
+.tr-badge {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--tl-subtle-fill);
+  color: var(--tl-muted);
+  border: 1px solid var(--tl-border);
+}
+
+.tr-badge.is-ms {
+  background: var(--tl-active-bg);
+  color: var(--tl-primary);
+  border-color: color-mix(in srgb, var(--tl-primary) 30%, transparent);
+  font-weight: 500;
+}
+
+.tr-row {
+  margin-bottom: 6px;
+}
+
+.tr-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.tr-key-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tr-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 5px;
+}
+
+.tr-input {
+  width: 100%;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--tl-border);
+  border-radius: 5px;
+  background: var(--tl-surface);
+  color: var(--tl-fg);
+  font-size: 11.5px;
+  outline: none;
+  min-width: 0;
+}
+
+.tr-input::placeholder {
+  color: var(--tl-muted);
+}
+
+.tr-input:focus {
+  border-color: var(--tl-primary);
+}
+
+.tr-note {
+  margin: 0 0 7px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--tl-muted);
+}
+
+.tr-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -516,6 +699,10 @@ button, input, select {
   font-weight: 600;
 }
 
+.conv-title.is-translating {
+  opacity: 0.65;
+}
+
 .current-pill {
   font-size: 10px;
   padding: 0 4px;
@@ -575,7 +762,8 @@ button, input, select {
   pointer-events: auto;
 }
 
-.conv-row.is-starred:not(:hover):not(:focus-within) .act-rename {
+.conv-row.is-starred:not(:hover):not(:focus-within) .act-rename,
+.conv-row.is-starred:not(:hover):not(:focus-within) .act-translate {
   opacity: 0;
   pointer-events: none;
 }
@@ -598,6 +786,15 @@ button, input, select {
 .act-btn:hover {
   background: var(--tl-press);
   color: var(--tl-fg);
+}
+
+.act-translate {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.act-translate.active {
+  color: var(--tl-primary);
 }
 
 .act-star.starred {
@@ -660,7 +857,8 @@ button, input, select {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chevron, .search-input, .conv-row {
+  .chevron, .search-input, .conv-row, .busy-dot {
     transition: none;
+    animation: none;
   }
 }
