@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src 'none'; object-src 'none'">
+  <title>Conversation Timeline</title>
+  <script src="/preload.js"></script>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="topbar">
+      <div class="search-wrap">
+        <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <input
+          id="search-input"
+          class="search-input"
+          type="search"
+          placeholder="搜索标题、提问内容或日期（如 11-11）"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <button id="search-clear" class="icon-btn search-clear hidden" type="button" aria-label="Clear">✕</button>
+      </div>
+
+      <div class="toolbar">
+        <div class="seg-group" role="group" id="group-mode-seg">
+          <button type="button" class="seg-btn active" data-group-mode="ymd" id="btn-mode-ymd">年/月/日</button>
+          <button type="button" class="seg-btn" data-group-mode="ym" id="btn-mode-ym">年/月</button>
+        </div>
+
+        <div class="seg-group" role="group" id="time-field-seg">
+          <button type="button" class="seg-btn active" data-time-field="created" id="btn-time-created">发起日</button>
+          <button type="button" class="seg-btn" data-time-field="updated" id="btn-time-updated">活跃日</button>
+        </div>
+
+        <select id="workspace-select" class="ws-select hidden" aria-label="Project Filter">
+          <option value="">全部项目</option>
+        </select>
+
+        <div class="toolbar-spacer"></div>
+
+        <button id="toggle-cal-btn" class="ghost-btn active" type="button">日历</button>
+        <button id="fold-toggle-btn" class="ghost-btn" type="button">收起全部</button>
+        <button id="lang-toggle-btn" class="ghost-btn" type="button" title="Switch Language / 切换语言">EN</button>
+      </div>
+    </header>
+
+    <section id="calendar-panel" class="calendar-panel" aria-label="Monthly Calendar">
+      <div class="cal-header">
+        <button id="cal-prev" class="icon-btn" type="button" aria-label="Previous Month">‹</button>
+        <button id="cal-title" class="cal-title-btn" type="button"></button>
+        <button id="cal-next" class="icon-btn" type="button" aria-label="Next Month">›</button>
+        <div class="toolbar-spacer"></div>
+        <button id="cal-today" class="text-link-btn" type="button">今天</button>
+        <button id="cal-clear-filter" class="text-link-btn accent hidden" type="button">显示全部日期</button>
+      </div>
+      <div id="cal-weekdays" class="cal-weekdays" aria-hidden="true"></div>
+      <div id="cal-grid" class="cal-grid" role="grid"></div>
+    </section>
+
+    <div id="summary-bar" class="summary-bar">
+      <span id="summary-text">正在读取历史对话…</span>
+      <button id="refresh-btn" class="text-link-btn" type="button">刷新</button>
+    </div>
+
+    <main id="tree-root" class="tree-root" role="tree" aria-label="Conversation Timeline Tree">
+    </main>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "command": "node",
+  "args": ["main.mjs"],
+  "restart_policy": "always",
+  "display_name": "Conversation Timeline",
+  "description": "Organize conversation history into collapsible Year / Month / Day folders with a monthly calendar and one-click session switching.",
+  "has_web_ui": true,
+  "ui_config": {
+    "display_name": "Conversation Timeline",
+    "views": [
+      {
+        "path": "/",
+        "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE",
+        "title": "Conversation Timeline"
+      }
+    ]
+  }
+}

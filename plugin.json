@@ -1,0 +1,28 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "conversation-timeline",
+  "displayName": "Conversation Timeline",
+  "version": "1.0.0",
+  "description": "Organize conversation history into collapsible Year / Month / Day folders with an interactive monthly calendar, search, starring, custom titles, and one-click session switching.",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "打开按日期整理的对话时间归档面板",
+    "Open the Conversation Timeline panel organized by Year / Month / Day",
+    "帮我查找本月关于某个主题的历史对话"
+  ],
+  "author": {
+    "name": "Wriquet",
+    "url": "https://github.com/Wriquet"
+  },
+  "homepage": "https://github.com/Wriquet/conversation-timeline",
+  "repository": "https://github.com/Wriquet/conversation-timeline",
+  "license": "MIT",
+  "keywords": [
+    "conversations",
+    "timeline",
+    "calendar",
+    "history",
+    "organizer",
+    "folders"
+  ]
+}
