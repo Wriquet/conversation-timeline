@@ -19,6 +19,9 @@ export const DEFAULT_PREFS = {
   lang: 'auto',          // 'auto' | 'zh' | 'en'
 };
 
+const VAGUE_PROMPT_RE = /^(?:1|2|3|ok|yes|好|好的|继续|开始|执行|看看|看下|看看这个|看下这个|看看这个问题|看下这个问题[，,。.\s\w\u4e00-\u9fff]{0,6}|帮我看下|帮我看看|帮我看一下|帮我看下这个需求[^。！？!?]*|处理下这个|处理一下这个|解决下这个|这是什么|怎么解决)/i;
+const GENERIC_HEADING_RE = /(?:一句话结论|结论速览|排查结论|问题定位|排查报告|根因分析|根因剖析|原因分析|报错原因|排查证据|解决方案|修复方案|核心结论|总结|背景)/;
+
 export function resolvePaths(env = process.env, home = homedir()) {
   const envData = env.ANTIGRAVITY_EXECUTABLE_DATA_DIR;
   if (envData) {
@@ -93,55 +96,170 @@ export function extractPromptText(rawContent) {
   text = text
     .replace(/<ADDITIONAL_METADATA>[\s\S]*?<\/ADDITIONAL_METADATA>/gi, '')
     .replace(/<USER_SETTINGS_CHANGE>[\s\S]*?<\/USER_SETTINGS_CHANGE>/gi, '')
-    .replace(/```[\s\S]*?```/g, ' [code] ')
+    .replace(/```[\s\S]*?```/g, ' ')
     .trim();
   return text;
 }
 
+/**
+ * Strip full local filesystem paths like `@/Users/foo/Downloads/report.docx`
+ * or `C:\Users\foo\video.mp4` into concise filenames, and compact long URLs.
+ */
 export function compactInlineUrls(str) {
-  return String(str || '').replace(/https?:\/\/([^\s\u4e00-\u9fff]+)/gi, (_full, rest) => {
+  let out = String(str || '');
+
+  // Compact URLs
+  out = out.replace(/https?:\/\/([^\s\u4e00-\u9fff]+)/gi, (_full, rest) => {
     const clean = rest.replace(/[),.。，；！!？?]+$/, '');
-    const gh = clean.match(/^github\.com\/([^/]+\/[^/?#]+)/i);
-    if (gh) return `${gh[1]} `;
-    if (/feishu\.cn|larksuite\.com/i.test(clean)) return '[Feishu] ';
+    const gh = clean.match(/^github\.com\/[^/]+\/([^/?#]+)/i);
+    if (gh) return `（${gh[1]}）`;
+    if (/feishu\.cn|larksuite\.com/i.test(clean)) return ' ';
     const host = clean.split('/')[0].replace(/^www\./i, '');
-    return `[${host}] `;
+    return `（${host}）`;
   });
+
+  // Compact POSIX / Windows local file paths (@/Users/.../file.ext or C:\...\file.ext)
+  out = out.replace(
+    /@?(?:\/(?:Users|home|var|tmp|opt|private|Volumes)\/|[A-Za-z]:\\)(?:[^\s\u4e00-\u9fff/\\]+[/\\])*([^\s/\\]+\.[A-Za-z0-9]{1,8})/g,
+    (_full, file) => `（${file}）`
+  );
+
+  // Also handle local paths whose filename contains CJK characters (e.g. /Users/wangqi/Downloads/尚_原文.docx看下...)
+  out = out.replace(
+    /@?(?:\/(?:Users|home|var|tmp|opt|private|Volumes)\/|[A-Za-z]:\\)(?:[^\s/\\]+[/\\])+([^\s/\\]+?\.[A-Za-z0-9]{1,8})/g,
+    (_full, file) => `（${file}）`
+  );
+
+  return out;
 }
 
-export function summarizePrompt(text, artifacts = []) {
+/**
+ * If a line starts with an English repo/path/tag like `（escrcpy）这个项目能打卡吗`
+ * or `GAMECO_BRANCH 帮我审查代码` while containing Chinese text, put the Chinese
+ * clause first so Chinese conversations always start with Chinese characters.
+ */
+export function promoteChineseClause(line) {
+  let s = String(line || '').trim();
+  if (!/[\u4e00-\u9fff]/.test(s)) return s;
+
+  const suffixTags = [];
+
+  // Case 1: Leading parenthesized tag(s) `（xxx）中文内容` -> `中文内容（xxx）`
+  const leadParen = s.match(/^(?:（([^）]{1,40})）\s*)+([\s\S]+)$/);
+  if (leadParen && /[\u4e00-\u9fff]/.test(leadParen[2])) {
+    const tag = leadParen[1];
+    s = leadParen[2].trim().replace(/^的\s*/, '').replace(/[。.]+$/, '');
+    if (!/^(?:微信图片|截屏|Screenshot|image|media_)/i.test(tag)) {
+      suffixTags.push(tag);
+    }
+  }
+
+  // Case 2: Leading long ASCII identifier/branch/API path (>= 8 ASCII chars) followed by Chinese
+  const leadAscii = s.match(/^([A-Za-z0-9_./:@\[\]-]{8,})\s*(?:（[^）]*）\s*)*([\u4e00-\u9fff][\s\S]*)$/);
+  if (leadAscii && leadAscii[2].length >= 4) {
+    const prefix = leadAscii[1].replace(/^@/, '');
+    const shortPrefix = prefix.length > 22 ? `${prefix.slice(0, 20)}…` : prefix;
+    s = leadAscii[2].trim().replace(/^的\s*/, '').replace(/[。.]+$/, '');
+    suffixTags.push(shortPrefix);
+  }
+
+  if (suffixTags.length > 0) {
+    return `${s}（${suffixTags.join(' · ')}）`;
+  }
+  return s;
+}
+
+export function extractAssistantTopic(assistantContent) {
+  if (typeof assistantContent !== 'string' || !assistantContent.trim()) return '';
+  const cleaned = assistantContent
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/```[\s\S]*?```/g, ' ');
+
+  const lines = cleaned.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  // 1. Check only the opening heading (first 2 lines); if it's a generic section header like "一句话结论", read the sentence beneath it instead of jumping to subheadings
+  for (const line of lines.slice(0, 2)) {
+    const h = line.match(/^#{1,4}\s+(.+)$/);
+    if (h) {
+      const heading = h[1].replace(/[*`]/g, '').replace(/^[一二三四五六七八九十0-9]+[、.．)\s]+/, '').trim();
+      if (heading.length >= 6 && !(heading.length <= 16 && GENERIC_HEADING_RE.test(heading))) {
+        return heading;
+      }
+    }
+  }
+
+  // 2. Join early non-heading lines and extract a complete meaningful clause/topic
+  const bodyText = lines
+    .filter((l) => !/^#{1,6}\s/.test(l) && !/^[-:|]+$/.test(l))
+    .slice(0, 5)
+    .map((l) => l.replace(/^[-*>\d.)]+\s*/, ''))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const boldMatch = bodyText.match(/\*\*([^*]{8,44})\*\*/);
+  if (boldMatch && /[\u4e00-\u9fff]/.test(boldMatch[1])) {
+    return boldMatch[1].trim();
+  }
+
+  const cleanBody = bodyText.replace(/[*`]/g, '').trim();
+  const clauseEnd = cleanBody.search(/[。！？；\n]/);
+  if (clauseEnd >= 8 && clauseEnd <= 48) {
+    return cleanBody.slice(0, clauseEnd).trim();
+  }
+  return cleanBody;
+}
+
+export function summarizePrompt(text, artifacts = [], assistantContent = '') {
   const rawLines = String(text || '')
     .split(/\r?\n/)
     .map((l) => l.replace(/^#+\s*/, '').replace(/^>\s*/, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').trim())
     .filter(Boolean);
 
   let chosen = '';
+  let fallbackTagged = '';
   for (const line of rawLines) {
-    const withoutUrls = line.replace(/https?:\/\/[^\s\u4e00-\u9fff]+/gi, '').trim();
-    if (withoutUrls.length >= 2) {
-      chosen = compactInlineUrls(line).replace(/\s+/g, ' ').trim();
+    const compacted = promoteChineseClause(compactInlineUrls(line).replace(/\s+/g, ' ').trim());
+    const strippedNoise = compacted.replace(/（(?:微信图片|截屏|Screenshot|image|media_)[^）]*）/gi, '').trim();
+    if (!fallbackTagged && strippedNoise.length >= 2) fallbackTagged = strippedNoise;
+    // Prefer a line that has real words outside parenthesized URL/host tags
+    const outsideTags = strippedNoise.replace(/（[^）]*）/g, '').trim();
+    if (outsideTags.length >= 2) {
+      chosen = strippedNoise;
       break;
     }
   }
+  if (!chosen) chosen = fallbackTagged;
 
-  if (!chosen && artifacts.length > 0) {
-    chosen = artifacts[0].replace(/\.md$/i, '').replace(/_/g, ' ').trim();
+  const cleanArtifact = artifacts.length > 0
+    ? artifacts[0].replace(/\.md$/i, '').replace(/_/g, ' ').trim()
+    : '';
+  const aiTopic = extractAssistantTopic(assistantContent);
+
+  // When prompt is empty or vague ("看看这个问题", "1", "帮我看下这个需求"), enrich with artifact or AI topic
+  if (!chosen || VAGUE_PROMPT_RE.test(chosen)) {
+    if (cleanArtifact) {
+      chosen = chosen && !/^(?:1|2|3)$/.test(chosen) ? `${cleanArtifact}` : cleanArtifact;
+    } else if (aiTopic) {
+      chosen = aiTopic;
+    }
   }
+
   if (!chosen && rawLines.length > 0) {
-    chosen = compactInlineUrls(rawLines[0]).replace(/\s+/g, ' ').trim();
+    chosen = promoteChineseClause(compactInlineUrls(rawLines[0]).replace(/\s+/g, ' ').trim());
   }
   if (!chosen) {
-    chosen = '(Media Conversation)';
+    chosen = '图片或附件对话';
   }
 
   let title = chosen;
   if (title.length > 52) {
     const endPunct = title.slice(0, 52).search(/[。！？；]/);
-    title = endPunct >= 12 ? title.slice(0, endPunct) : `${title.slice(0, 50)}…`;
+    title = endPunct >= 10 ? title.slice(0, endPunct) : `${title.slice(0, 50)}…`;
   }
 
   const rest = compactInlineUrls(rawLines.join(' ')).replace(/\s+/g, ' ').trim();
-  const snippet = rest.length > 130 ? `${rest.slice(0, 128)}…` : rest;
+  const snippet = (rest || aiTopic).slice(0, 130);
 
   return { title, snippet };
 }
@@ -157,6 +275,7 @@ export function parseTranscriptFast(transcriptPath, fileSize, mtimeMs) {
   let createdAt = '';
   let updatedAt = '';
   let promptText = '';
+  let assistantText = '';
   let stepCount = 1;
   let hasMedia = false;
 
@@ -166,17 +285,19 @@ export function parseTranscriptFast(transcriptPath, fileSize, mtimeMs) {
     const head = readChunk(fd, 0, headLen);
 
     const headLines = head.split('\n');
-    for (let i = 0; i < Math.min(headLines.length, 8); i++) {
+    for (let i = 0; i < Math.min(headLines.length, 25); i++) {
       const line = headLines[i].trim();
       if (!line) continue;
       try {
         const obj = JSON.parse(line);
         if (!createdAt && typeof obj.created_at === 'string') createdAt = obj.created_at;
-        if (obj.type === 'USER_INPUT' && typeof obj.content === 'string') {
+        if (!promptText && obj.type === 'USER_INPUT' && typeof obj.content === 'string') {
           promptText = extractPromptText(obj.content);
           hasMedia = Array.isArray(obj.media) && obj.media.length > 0;
-          break;
+        } else if (!assistantText && obj.type === 'PLANNER_RESPONSE' && typeof obj.content === 'string' && obj.content.trim()) {
+          assistantText = obj.content.trim();
         }
+        if (promptText && assistantText) break;
       } catch {
         const tsMatch = line.match(/"created_at"\s*:\s*"([^"]+)"/);
         if (!createdAt && tsMatch) createdAt = tsMatch[1];
@@ -203,6 +324,20 @@ export function parseTranscriptFast(transcriptPath, fileSize, mtimeMs) {
     if (stepMatches.length > 0) {
       stepCount = Number(stepMatches[stepMatches.length - 1][1]) + 1;
     }
+
+    // If first assistant reply happened after several tool calls (>64KB), grab one from tail
+    if (!assistantText && tailStr !== head) {
+      for (const line of tailStr.split('\n').reverse()) {
+        if (!line.includes('"PLANNER_RESPONSE"') || !line.includes('"content"')) continue;
+        try {
+          const obj = JSON.parse(line);
+          if (obj.type === 'PLANNER_RESPONSE' && typeof obj.content === 'string' && obj.content.trim()) {
+            assistantText = obj.content.trim();
+            break;
+          }
+        } catch {}
+      }
+    }
   } catch {
     // Ignore transient read errors while files are written
   } finally {
@@ -216,6 +351,7 @@ export function parseTranscriptFast(transcriptPath, fileSize, mtimeMs) {
     createdAt: createdAt || fallbackIso,
     updatedAt: updatedAt || fallbackIso,
     promptText,
+    assistantText,
     stepCount,
     hasMedia,
   };

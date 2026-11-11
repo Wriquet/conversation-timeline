@@ -5,10 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   compactInlineUrls,
+  extractAssistantTopic,
   extractPromptText,
   normalizePrefs,
   parseTranscriptFast,
   parseWorkspaceName,
+  promoteChineseClause,
   resolvePaths,
   summarizePrompt,
 } from '../lib.mjs';
@@ -18,29 +20,43 @@ test('extractPromptText extracts USER_REQUEST and strips metadata blocks', () =>
   assert.equal(extractPromptText(raw), '帮我按年/月/日整理左侧对话列表');
 });
 
-test('compactInlineUrls shortens GitHub, Feishu, and generic URLs', () => {
+test('compactInlineUrls and promoteChineseClause put Chinese subject at the beginning', () => {
+  const githubPrompt = summarizePrompt('https://github.com/viarotel-org/escrcpy 这个项目能控制iphone来打卡吗？');
+  assert.equal(githubPrompt.title, '这个项目能控制iphone来打卡吗？（escrcpy）');
+
+  const localPathPrompt = summarizePrompt('/Users/wangqi/Downloads/408309-1080p.mp4给这个视频加中文字幕。');
+  assert.equal(localPathPrompt.title, '给这个视频加中文字幕（408309-1080p.mp4）');
+
   assert.equal(
-    compactInlineUrls('https://github.com/viarotel-org/escrcpy 这个项目怎么用'),
-    'viarotel-org/escrcpy  这个项目怎么用'
+    promoteChineseClause('GAMECO_MASTER_FIX_RETAIN_DUP_261027帮我审查下这个修复的代码'),
+    '帮我审查下这个修复的代码（GAMECO_MASTER_FIX_RE…）'
   );
-  assert.equal(
-    compactInlineUrls('https://acn6eda1cxtm.feishu.cn/wiki/EhANw0mDniqq 帮我看需求'),
-    '[Feishu]  帮我看需求'
+
+  const multiLineUrlFirst = summarizePrompt(
+    'http://172.16.0.133:10580/plan-center\n登录之后检查一下工时同步报错'
   );
+  assert.equal(multiLineUrlFirst.title, '登录之后检查一下工时同步报错');
 });
 
-test('summarizePrompt skips bare URL lines when descriptive lines follow and falls back to artifacts', () => {
-  const withSecondLine = summarizePrompt(
-    'https://example.com/some/very/long/path\n起落架工卡交接需求分析与评审',
-    []
+test('summarizePrompt enriches vague prompts using artifacts or AI Chinese reply headings', () => {
+  const feishuVague = summarizePrompt(
+    'https://acn6eda1cxtm.feishu.cn/wiki/EhANw0mDniqq\n帮我看下这个需求需要怎么做',
+    ['LR_HOV_01_需求纠偏与落地指南.md'],
+    ''
   );
-  assert.equal(withSecondLine.title, '起落架工卡交接需求分析与评审');
+  assert.equal(feishuVague.title, 'LR HOV 01 需求纠偏与落地指南');
 
-  const urlOnlyWithArtifact = summarizePrompt(
-    'https://acn6eda1cxtm.feishu.cn/wiki/EhANw0mDniqq',
-    ['LR_HOV_01_需求纠偏与落地指南.md']
+  const screenshotOnly = summarizePrompt(
+    '看看这个问题',
+    [],
+    '### 1. 南航 Pre 页面加载异常根因分析\n接口返回超时导致渲染中断。'
   );
-  assert.equal(urlOnlyWithArtifact.title, 'LR HOV 01 需求纠偏与落地指南');
+  assert.equal(screenshotOnly.title, '南航 Pre 页面加载异常根因分析');
+  assert.equal(
+    extractAssistantTopic('## 一句话结论\n这次报错是因为 **南航 Pre 网关鉴权缓存未刷新** 导致的。\n## 详细根因剖析\n...'),
+    '南航 Pre 网关鉴权缓存未刷新'
+  );
+  assert.equal(extractAssistantTopic('我把最新版的 **起落架工卡交接需求** 梳理如下'), '起落架工卡交接需求');
 });
 
 test('parseWorkspaceName supports POSIX and Windows file URIs', () => {
@@ -69,7 +85,7 @@ test('normalizePrefs validates UUIDs, aliases, and enums safely', () => {
   assert.equal(prefs.lang, 'en');
 });
 
-test('parseTranscriptFast reads head and tail timestamps and step count accurately', () => {
+test('parseTranscriptFast reads head, tail, and assistant reply accurately', () => {
   const dir = mkdtempSync(join(tmpdir(), 'tl-test-'));
   try {
     const file = join(dir, 'transcript.jsonl');
@@ -79,14 +95,14 @@ test('parseTranscriptFast reads head and tail timestamps and step count accurate
         source: 'USER_EXPLICIT',
         type: 'USER_INPUT',
         created_at: '2026-11-11T07:00:00Z',
-        content: '<USER_REQUEST>\n测试按日期归档对话\n</USER_REQUEST>',
+        content: '<USER_REQUEST>\n看看这个问题\n</USER_REQUEST>',
       }),
       JSON.stringify({
         step_index: 4,
         source: 'MODEL',
         type: 'PLANNER_RESPONSE',
         created_at: '2026-11-11T07:15:30Z',
-        content: 'Done.',
+        content: '### 定检工包同步失败排查结论\n已完成修复。',
       }),
     ].join('\n') + '\n';
     writeFileSync(file, lines, 'utf-8');
@@ -94,7 +110,8 @@ test('parseTranscriptFast reads head and tail timestamps and step count accurate
     const parsed = parseTranscriptFast(file, st.size, st.mtimeMs);
     assert.equal(parsed.createdAt, '2026-11-11T07:00:00Z');
     assert.equal(parsed.updatedAt, '2026-11-11T07:15:30Z');
-    assert.equal(parsed.promptText, '测试按日期归档对话');
+    assert.equal(parsed.promptText, '看看这个问题');
+    assert.match(parsed.assistantText, /定检工包同步失败排查结论/);
     assert.equal(parsed.stepCount, 5);
   } finally {
     rmSync(dir, { recursive: true, force: true });

@@ -243,12 +243,12 @@ function scanConversations(force = false) {
         dMtime = statSync(convDir).mtimeMs;
       } catch {}
 
-      const stamp = `${tStat.size}:${tStat.mtimeMs}:${dMtime}`;
+      const stamp = `v2:${tStat.size}:${tStat.mtimeMs}:${dMtime}`;
       let base = recordCache.get(id);
       if (!base || base.stamp !== stamp) {
         const parsed = parseTranscriptFast(transcriptPath, tStat.size, tStat.mtimeMs);
         const artifacts = listArtifacts(convDir);
-        const { title, snippet } = summarizePrompt(parsed.promptText, artifacts);
+        const { title, snippet } = summarizePrompt(parsed.promptText, artifacts, parsed.assistantText);
         base = {
           id,
           stamp,

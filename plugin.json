@@ -2,7 +2,7 @@
   "$schema": "https://antigravity.google/schemas/v1/plugin.json",
   "name": "conversation-timeline",
   "displayName": "Conversation Timeline",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Organize conversation history into collapsible Year / Month / Day folders with an interactive monthly calendar, search, starring, custom titles, and one-click session switching.",
   "logo": "assets/logo.svg",
   "suggestedPrompts": [
